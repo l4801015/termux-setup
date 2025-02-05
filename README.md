@@ -1,5 +1,8 @@
-## Termux Development Setup
+# Termux Development Setup
 
+One-command configuration for Termux with development essentials.
+
+## Installation
 ```bash
 pkg update -y && \
 pkg upgrade -y && \
