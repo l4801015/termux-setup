@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Redirect all error messages to a log file
+exec 2> setup_errors.log
+
 # Function to print debug messages with timestamps
 debug_message() {
     echo "[$(date +"%Y-%m-%d %H:%M:%S")] $1"
@@ -9,35 +12,68 @@ debug_message() {
 # Function to install core packages
 install_core_packages() {
     debug_message "Starting installation of core packages..."
-    pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro
+    pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro || {
+        echo "Error: Failed to install core packages." >&2
+        exit 1
+    }
     debug_message "Finished installation of core packages."
 }
 
 # Function to install Ubuntu via proot-distro
 install_ubuntu() {
     debug_message "Starting installation of Ubuntu via proot-distro..."
-    proot-distro install ubuntu
+    proot-distro install ubuntu || {
+        echo "Error: Failed to install Ubuntu via proot-distro." >&2
+        exit 1
+    }
     debug_message "Finished installation of Ubuntu."
 }
 
 # Function to configure truecolor support in Termux
 configure_truecolor() {
     debug_message "Starting configuration of truecolor support..."
-    mkdir -p ~/.termux
-    echo "termux-transient-keys = enter,arrow" > ~/.termux/termux.properties
-    echo "export COLORTERM=truecolor" >> ~/.bashrc
-    echo "export TERM=xterm-256color" >> ~/.bashrc
-    termux-reload-settings
+    mkdir -p ~/.termux || {
+        echo "Error: Failed to create ~/.termux directory." >&2
+        exit 1
+    }
+    echo "termux-transient-keys = enter,arrow" > ~/.termux/termux.properties || {
+        echo "Error: Failed to write to ~/.termux/termux.properties." >&2
+        exit 1
+    }
+    echo "export COLORTERM=truecolor" >> ~/.bashrc || {
+        echo "Error: Failed to update ~/.bashrc." >&2
+        exit 1
+    }
+    echo "export TERM=xterm-256color" >> ~/.bashrc || {
+        echo "Error: Failed to update ~/.bashrc." >&2
+        exit 1
+    }
+    termux-reload-settings || {
+        echo "Error: Failed to reload Termux settings." >&2
+        exit 1
+    }
     debug_message "Finished configuration of truecolor support."
 }
 
 # Function to set up Zsh and Oh My Zsh
 setup_zsh() {
     debug_message "Starting Zsh setup..."
-    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-    sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="af-magic"/' ~/.zshrc
-    echo "export TERM=xterm-256color" >> ~/.zshrc
-    chsh -s zsh
+    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
+        echo "Error: Failed to install Oh My Zsh." >&2
+        exit 1
+    }
+    sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="af-magic"/' ~/.zshrc || {
+        echo "Error: Failed to update Zsh theme in ~/.zshrc." >&2
+        exit 1
+    }
+    echo "export TERM=xterm-256color" >> ~/.zshrc || {
+        echo "Error: Failed to update ~/.zshrc." >&2
+        exit 1
+    }
+    chsh -s zsh || {
+        echo "Error: Failed to set Zsh as default shell." >&2
+        exit 1
+    }
     debug_message "Finished Zsh setup."
 }
 
@@ -46,7 +82,10 @@ install_vim_plug() {
     debug_message "Starting installation of vim-plug..."
     VIM_PLUG_PATH="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/autoload/plug.vim"
     curl -fLo "$VIM_PLUG_PATH" --create-dirs \
-        https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+        https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim || {
+        echo "Error: Failed to install vim-plug." >&2
+        exit 1
+    }
     debug_message "Finished installation of vim-plug."
 }
 
@@ -54,7 +93,10 @@ install_vim_plug() {
 configure_neovim() {
     debug_message "Starting Neovim configuration..."
     NVIM_DIR="$HOME/.config/nvim"
-    mkdir -p "$NVIM_DIR"
+    mkdir -p "$NVIM_DIR" || {
+        echo "Error: Failed to create Neovim config directory." >&2
+        exit 1
+    }
 
     cat > "$NVIM_DIR/init.vim" << 'EOF'
 " Plugin management
@@ -125,14 +167,20 @@ EOF
 # Function to install Neovim plugins
 install_neovim_plugins() {
     debug_message "Starting installation of Neovim plugins..."
-    nvim --headless +PlugInstall +qa 2>/dev/null
+    nvim --headless +PlugInstall +qa 2>/dev/null || {
+        echo "Error: Failed to install Neovim plugins." >&2
+        exit 1
+    }
     debug_message "Finished installation of Neovim plugins."
 }
 
 # Function to compile Treesitter parsers
 compile_treesitter_parsers() {
     debug_message "Starting compilation of Treesitter parsers..."
-    nvim --headless -c "TSInstallSync javascript typescript lua python bash json" -c "qall"
+    nvim --headless -c "TSInstallSync javascript typescript lua python bash json" -c "qall" || {
+        echo "Error: Failed to compile Treesitter parsers." >&2
+        exit 1
+    }
     debug_message "Finished compilation of Treesitter parsers."
 }
 
@@ -141,12 +189,27 @@ verify_installations() {
     debug_message "Verifying installations..."
     echo -e "\n\033[1;32mInstallation complete!\033[0m"
     echo -e "\nVersions:"
-    git --version | head -n 1
-    node --version
-    nvim --version | head -n 1
-    zsh --version
+    git --version | head -n 1 || {
+        echo "Error: Git version check failed." >&2
+        exit 1
+    }
+    node --version || {
+        echo "Error: Node.js version check failed." >&2
+        exit 1
+    }
+    nvim --version | head -n 1 || {
+        echo "Error: Neovim version check failed." >&2
+        exit 1
+    }
+    zsh --version || {
+        echo "Error: Zsh version check failed." >&2
+        exit 1
+    }
     echo -e "\n\033[38;2;255;100;100mTruecolor test:\033[0m"
-    curl -s https://gist.githubusercontent.com/lifepillar/09a44b8cf0f9397465614e622979107f/raw/24-bit-color.sh | bash
+    curl -s https://gist.githubusercontent.com/lifepillar/09a44b8cf0f9397465614e622979107f/raw/24-bit-color.sh | bash || {
+        echo "Error: Truecolor test failed." >&2
+        exit 1
+    }
     debug_message "Finished verification."
 }
 
@@ -176,9 +239,15 @@ main() {
     PID_TREESITTER=$!
 
     # Wait for both processes to complete
-    wait $PID_PLUGINS
+    wait $PID_PLUGINS || {
+        echo "Error: Neovim plugin installation failed." >&2
+        exit 1
+    }
     debug_message "Neovim plugins process completed."
-    wait $PID_TREESITTER
+    wait $PID_TREESITTER || {
+        echo "Error: Treesitter compilation failed." >&2
+        exit 1
+    }
     debug_message "Treesitter compilation process completed."
 
     verify_installations
