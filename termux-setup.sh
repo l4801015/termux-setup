@@ -126,6 +126,10 @@ zsh --version
 echo -e "\n\033[38;2;255;100;100mTruecolor test:\033[0m"
 curl -s https://gist.githubusercontent.com/lifepillar/09a44b8cf0f9397465614e622979107f/raw/24-bit-color.sh | bash
 
+# Install Ubuntu via proot-distro
+echo "Installing Ubuntu via proot-distro..."
+proot-distro install ubuntu
+
 echo -e "\n\033[1;33mNext steps:\033[0m"
 echo "1. Restart Termux session to activate Zsh"
 echo "2. Start Neovim: nvim"
