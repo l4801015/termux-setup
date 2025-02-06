@@ -231,24 +231,10 @@ main() {
     install_vim_plug
     configure_neovim
 
-    # Run Neovim plugin installation and Treesitter compilation in parallel
-    debug_message "Running Neovim plugin installation and Treesitter compilation in parallel..."
-    install_neovim_plugins &
-    PID_PLUGINS=$!
-    compile_treesitter_parsers &
-    PID_TREESITTER=$!
-
-    # Wait for both processes to complete
-    wait $PID_PLUGINS || {
-        echo "Error: Neovim plugin installation failed." >&2
-        exit 1
-    }
-    debug_message "Neovim plugins process completed."
-    wait $PID_TREESITTER || {
-        echo "Error: Treesitter compilation failed." >&2
-        exit 1
-    }
-    debug_message "Treesitter compilation process completed."
+    # Run Neovim plugin installation and Treesitter compilation sequentially
+    debug_message "Starting sequential installation of Neovim plugins and Treesitter parsers..."
+    install_neovim_plugins
+    compile_treesitter_parsers
 
     verify_installations
     display_next_steps
