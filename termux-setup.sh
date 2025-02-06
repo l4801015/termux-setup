@@ -4,9 +4,15 @@ set -e
 # Redirect stdout to a log file and stderr to a separate log file
 exec > >(tee -a setup_output.log) 2> >(tee -a setup_errors.log >&2)
 
-# Function to print debug messages with timestamps
+# Function to print debug messages with timestamps and colors
 debug_message() {
-    echo "[$(date +"%Y-%m-%d %H:%M:%S")] $1"
+    # Define colors using ANSI escape codes
+    local GREEN='\033[0;32m'  # Green text
+    local YELLOW='\033[1;33m' # Bold yellow text
+    local RESET='\033[0m'     # Reset to default terminal color
+
+    # Print the message with a timestamp and color
+    echo -e "${GREEN}[${YELLOW}$(date +"%Y-%m-%d %H:%M:%S")${GREEN}] ${RESET}$1"
 }
 
 # Function to install core packages
