@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# Redirect all error messages to a log file
-exec 2> setup_errors.log
+# Redirect stdout to a log file and stderr to a separate log file
+exec > >(tee -a setup_output.log) 2> >(tee -a setup_errors.log >&2)
 
 # Function to print debug messages with timestamps
 debug_message() {
