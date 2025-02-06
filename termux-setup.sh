@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Install core utilities with compiler
+# Install core utilities with compiler and PRoot packages
 echo "Installing core packages..."
-pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make
+pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro
 
 # Configure terminal for truecolor
 echo "Setting up truecolor support..."
