@@ -27,13 +27,14 @@ install_core_packages() {
     }
 }
 
-# Function to install Ubuntu with proot-distro
+# Function to install Ubuntu via proot-distro
 install_ubuntu() {
-    debug_message "Installing Ubuntu distribution..."
-    proot-distro install ubuntu -y || {
-        echo "Error: Ubuntu installation failed." >&2
+    debug_message "Starting installation of Ubuntu via proot-distro..."
+    proot-distro install ubuntu || {
+        echo "Error: Failed to install Ubuntu via proot-distro." >&2
         exit 1
     }
+    debug_message "Finished installation of Ubuntu."
 }
 
 # Function to configure terminal truecolor support
