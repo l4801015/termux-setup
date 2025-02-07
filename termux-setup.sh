@@ -21,7 +21,7 @@ install_core_packages() {
     }
 
     debug_message "Installing core packages..."
-    pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro || {
+    pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro termux-tools || {
         echo "Error: Core package installation failed." >&2
         exit 1
     }
@@ -60,25 +60,31 @@ configure_truecolor() {
     }
 }
 
-# Function to configure Zsh with Oh My Zsh
+# Function to set up Zsh and Oh My Zsh
 setup_zsh() {
-    debug_message "Setting up Zsh environment..."
+    debug_message "Starting Zsh setup..."
+    
+    # 1. Install required dependency for changing shells
+    pkg install -y termux-tools || {
+        echo "Error: Failed to install termux-tools." >&2
+        exit 1
+    }
+
+    # 2. Install Oh My Zsh
     RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
-        echo "Error: Oh My Zsh installation failed." >&2
+        echo "Error: Failed to install Oh My Zsh." >&2
         exit 1
     }
 
-    # Set custom theme
-    sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="af-magic"/' ~/.zshrc || {
-        echo "Error: Failed to configure Zsh theme." >&2
+    # 3. Use Termux's proper chsh command
+    chsh -s zsh || {
+        echo "Error: Failed to set Zsh as default shell. You might need to:" >&2
+        echo "1. Run 'termux-reload-settings' manually" >&2
+        echo "2. Restart Termux session" >&2
         exit 1
     }
 
-    # Set Zsh as default shell
-    termux-chsh zsh || {
-        echo "Error: Failed to change default shell." >&2
-        exit 1
-    }
+    debug_message "Finished Zsh setup."
 }
 
 # Function to install vim-plug plugin manager
