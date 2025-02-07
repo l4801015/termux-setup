@@ -161,6 +161,19 @@ install_neovim_plugins() {
     }
 }
 
+install_ubuntu() {
+    if [ "$ENV_TYPE" = "termux" ]; then
+        debug_message "Installing Ubuntu proot environment..."
+        proot-distro install ubuntu || {
+            echo "Error: Failed to install Ubuntu via proot-distro" >&2
+            exit 1
+        }
+        debug_message "Ubuntu proot installation completed."
+    else
+        debug_message "Skipping Ubuntu installation - already in proot environment"
+    fi
+}
+
 # Verification
 verify_installation() {
     debug_message "Verifying installations..."
@@ -192,6 +205,7 @@ main() {
     }
     
     install_core_packages
+    install_ubuntu
     configure_truecolor
     setup_zsh
     configure_neovim
