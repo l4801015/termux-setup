@@ -18,13 +18,8 @@ detect_environment() {
     if [ -d "$PREFIX" ] && [ -x "$PREFIX/bin/pkg" ] && [ ! -d "/proc/1/root/.proot-dir" ]; then
         echo "termux"
     # Check for Ubuntu proot environment
-    elif [ -f "/etc/os-release" ] && grep -q 'ID=ubuntu' /etc/os-release && [ -d "/proc/1/root/.proot-dir" ]; then
+    else [ -f "/etc/os-release" ] && grep -q 'ID=ubuntu' /etc/os-release && [ -d "/proc/1/root/.proot-dir" ]; then
         echo "ubuntu_proot"
-    # Check for other proot environments
-    elif [ -d "/proc/1/root/.proot-dir" ]; then
-        echo "other_proot"
-    else
-        echo "unknown"
     fi
 }
 
