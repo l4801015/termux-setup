@@ -14,10 +14,15 @@ debug_message() {
 
 # Environment detection
 detect_environment() {
-    if [ -n "$TERMUX_VERSION" ] && [ ! -d "/proc/1/root/.proot-dir" ]; then
+    # Check for Termux (non-proot environment)
+    if [ -d "$PREFIX" ] && [ -x "$PREFIX/bin/pkg" ] && [ ! -d "/proc/1/root/.proot-dir" ]; then
         echo "termux"
-    elif [ -f "/etc/os-release" ] && grep -qi 'ubuntu' /etc/os-release && [ -d "/proc/1/root/.proot-dir" ]; then
+    # Check for Ubuntu proot environment
+    elif [ -f "/etc/os-release" ] && grep -q 'ID=ubuntu' /etc/os-release && [ -d "/proc/1/root/.proot-dir" ]; then
         echo "ubuntu_proot"
+    # Check for other proot environments
+    elif [ -d "/proc/1/root/.proot-dir" ]; then
+        echo "other_proot"
     else
         echo "unknown"
     fi
@@ -191,19 +196,46 @@ verify_installation() {
 # Main function
 main() {
     debug_message "Starting installation process..."
+    
+    # Detect execution environment
     ENV_TYPE=$(detect_environment)
     debug_message "Detected environment: $ENV_TYPE"
     
-    # Initialize package manager
+    # Handle environment validation
+    case $ENV_TYPE in
+        "termux")
+            debug_message "Initializing Termux setup..."
+            ;;
+        "ubuntu_proot")
+            debug_message "Initializing Ubuntu proot setup..."
+            ;;
+        "other_proot")
+            echo "ERROR: Unsupported proot environment" >&2
+            echo "This script only works in:" >&2
+            echo "- Native Termux installation" >&2
+            echo "- Ubuntu proot distribution" >&2
+            exit 1
+            ;;
+        *)
+            echo "ERROR: Unrecognized execution environment" >&2
+            echo "Could not detect either:" >&2
+            echo "- Termux (make sure you're not in proot)" >&2
+            echo "- Ubuntu proot distribution" >&2
+            exit 1
+            ;;
+    esac
+    
+    # Initialize package management
     setup_package_manager
     
-    # Update packages
-    debug_message "Updating package lists..."
+    # Update package lists
+    debug_message "Updating package repositories..."
     $UPDATE_CMD || {
-        echo "Error: Failed to update packages" >&2
+        echo "Error: Failed to update package lists" >&2
         exit 1
     }
     
+    # Core installation sequence
     install_core_packages
     install_ubuntu
     configure_truecolor
@@ -211,19 +243,22 @@ main() {
     configure_neovim
     install_neovim_plugins
     verify_installation
-
+    
+    # Post-install guidance
     echo -e "\n\033[1;33mNext steps:\033[0m"
     case $ENV_TYPE in
         "termux")
             echo "1. Restart Termux session"
-            echo "2. Run: nvim"
+            echo "2. Start Neovim: nvim"
             echo "3. Access Ubuntu: proot-distro login ubuntu"
             ;;
         "ubuntu_proot")
-            echo "1. Restart your shell"
-            echo "2. Run: nvim"
+            echo "1. Restart shell session: exec zsh"
+            echo "2. Start Neovim: nvim"
             ;;
     esac
+    
+    debug_message "Installation process completed successfully"
 }
 
 # Start main process
