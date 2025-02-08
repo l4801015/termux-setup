@@ -1,45 +1,95 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
-# Redirect stdout and stderr to log files
-exec > >(tee -a setup_output.log) 2> >(tee -a setup_errors.log >&2)
+# Redirect all output to logs with timestamp
+exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }' | tee -a setup_output.log)
+exec 2> >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }' | tee -a setup_errors.log >&2)
 
-# Function to print debug messages
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RESET='\033[0m'
+
+# Enhanced debug logging
 debug_message() {
-    local GREEN='\033[0;32m'
-    local YELLOW='\033[1;33m'
-    local RESET='\033[0m'
-    echo -e "${GREEN}[${YELLOW}$(date +"%Y-%m-%d %H:%M:%S")${GREEN}] ${RESET}$1"
+    echo -e "${GREEN}[${YELLOW}$(date +"%Y-%m-%d %H:%M:%S")${GREEN}]${BLUE} $1 ${RESET}"
 }
 
-# Environment detection
+# Process ancestry check for proot
+check_proot_process() {
+    local pid=$$
+    while [ "$pid" -ne 1 ]; do
+        if ps -p "$pid" -o comm= | grep -qi 'proot'; then
+            return 0
+        fi
+        pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+    done
+    return 1
+}
+
+# Multi-layered environment detection
 detect_environment() {
-    # Check for Termux (non-proot environment)
-    if [ -d "$PREFIX" ] && [ -x "$PREFIX/bin/pkg" ] && [ ! -d "/proc/1/root/.proot-dir" ]; then
+    # Check Termux first
+    if [ -n "$TERMUX_VERSION" ] && [ -x "$PREFIX/bin/pkg" ]; then
         echo "termux"
-    # Check for Ubuntu proot environment (FIXED THIS LINE)
-    elif [ -f "/etc/os-release" ] && grep -q 'ID=ubuntu' /etc/os-release && [ -d "/proc/1/root/.proot-dir" ]; then
-        echo "ubuntu_proot"
+        return
     fi
+
+    # Proot environment checks
+    local is_proot_env=false
+    if check_proot_process; then
+        is_proot_env=true
+    elif [ -f "/proc/self/root/.proot-dir" ] || [ -d "/proc/sys/fs/binfmt_misc/proot" ]; then
+        is_proot_env=true
+    elif [ "$(stat -c %i /)" != "$(stat -c %i /proc/1/root/.)" ]; then
+        is_proot_env=true
+    fi
+
+    if $is_proot_env; then
+        # Verify Ubuntu
+        if [ -f "/etc/os-release" ] && grep -qi 'ID=ubuntu' /etc/os-release && command -v apt >/dev/null; then
+            echo "ubuntu_proot"
+        else
+            # Check for bind mounts as final verification
+            if mount | grep -q 'bind.*/proc'; then
+                echo "other_proot"
+            else
+                echo "unknown"
+            fi
+        fi
+        return
+    fi
+
+    echo "unknown"
 }
 
-# Package manager setup
+# Package manager configuration
 setup_package_manager() {
     case $ENV_TYPE in
         "termux")
+            debug_message "Configuring Termux packages"
             UPDATE_CMD="pkg update -y"
             INSTALL_CMD="pkg install -y"
             ;;
         "ubuntu_proot")
+            debug_message "Configuring Ubuntu packages"
             UPDATE_CMD="apt update -y"
             INSTALL_CMD="apt install -y"
-            # Ensure sudo is available
+            
+            # Ensure sudo availability
             if ! command -v sudo >/dev/null; then
+                debug_message "Installing sudo"
                 $INSTALL_CMD sudo
             fi
             ;;
+        "other_proot")
+            echo -e "${RED}Unsupported proot environment${RESET}" >&2
+            exit 1
+            ;;
         *)
-            echo "Unsupported environment" >&2
+            echo -e "${RED}Unrecognized execution environment${RESET}" >&2
             exit 1
             ;;
     esac
@@ -47,214 +97,64 @@ setup_package_manager() {
 
 # Core package installation
 install_core_packages() {
-    debug_message "Installing core packages for $ENV_TYPE..."
+    local base_packages="git curl wget zsh neovim ncurses-utils"
     
+    debug_message "Installing core packages"
     case $ENV_TYPE in
         "termux")
-            $INSTALL_CMD git nodejs curl wget openssh zsh neovim ncurses-utils \
-                clang make proot proot-distro termux-tools
+            $INSTALL_CMD $base_packages nodejs openssh proot-distro clang make
             ;;
         "ubuntu_proot")
-            $INSTALL_CMD git nodejs curl wget openssh zsh neovim ncurses-utils \
-                clang make proot
+            $INSTALL_CMD $base_packages nodejs npm build-essential proot
             ;;
     esac || {
-        echo "Error: Package installation failed" >&2
+        echo -e "${RED}Package installation failed${RESET}" >&2
         exit 1
     }
 }
 
-# Truecolor configuration
-configure_truecolor() {
-    debug_message "Configuring terminal display..."
+# Environment-specific configurations
+configure_environment() {
+    debug_message "Configuring environment specifics"
     
-    case $ENV_TYPE in
-        "termux")
-            mkdir -p ~/.termux
-            if ! grep -q "termux-transient-keys" ~/.termux/termux.properties 2>/dev/null; then
-                echo "termux-transient-keys = enter,arrow" >> ~/.termux/termux.properties
-            fi
-            termux-reload-settings
-            ;;
-    esac
-
-    # Common truecolor config
+    # Truecolor support
     if ! grep -q "COLORTERM=truecolor" ~/.zshrc 2>/dev/null; then
         echo "export COLORTERM=truecolor" >> ~/.zshrc
     fi
-    if ! grep -q "TERM=xterm-256color" ~/.zshrc 2>/dev/null; then
-        echo "export TERM=xterm-256color" >> ~/.zshrc
-    fi
-}
 
-# Zsh setup
-setup_zsh() {
-    debug_message "Configuring Zsh environment..."
-    
-    # Install Oh My Zsh
-    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
-        echo "Error: Oh My Zsh installation failed" >&2
-        exit 1
-    }
-
-    # Set Zsh as default shell
     case $ENV_TYPE in
         "termux")
-            chsh -s zsh || {
-                echo "Error: Failed to set Zsh as default shell" >&2
-                exit 1
-            }
+            # Termux-specific settings
+            mkdir -p ~/.termux
+            echo "termux-transient-keys = enter,arrow" >> ~/.termux/termux.properties
+            termux-reload-settings
             ;;
         "ubuntu_proot")
-            sudo chsh -s "$(command -v zsh)" "$(whoami)" || {
-                echo "Error: Failed to set Zsh as default shell" >&2
-                exit 1
-            }
+            # Ubuntu proot optimizations
+            echo "export PROOT_NO_SECCOMP=1" >> ~/.zshrc
             ;;
     esac
 }
 
-# Neovim configuration
-configure_neovim() {
-    debug_message "Setting up Neovim..."
-    NVIM_DIR="$HOME/.config/nvim"
-    mkdir -p "$NVIM_DIR"
-    
-    if [ ! -f "$NVIM_DIR/init.vim" ]; then
-        cat > "$NVIM_DIR/init.vim" << 'EOF'
-" Plugin management
-call plug#begin('~/.local/share/nvim/plugged')
-Plug 'preservim/nerdtree'
-Plug 'itchyny/lightline.vim'
-Plug 'morhetz/gruvbox'
-Plug 'nvim-treesitter/nvim-treesitter'
-Plug 'Yggdroot/indentLine'
-call plug#end()
-
-" Core configuration
-set termguicolors
-colorscheme gruvbox
-set background=dark
-
-" Plugin configs
-let g:indentLine_char = '│'
-lua << END
-require'nvim-treesitter.configs'.setup {
-  highlight = { enable = true },
-  indent = { enable = true }
-}
-END
-
-set tabstop=2 shiftwidth=2 expandtab
-set number cursorline
-nnoremap <C-n> :NERDTreeToggle<CR>
-EOF
-    fi
-}
-
-# Neovim plugin installation
-install_neovim_plugins() {
-    debug_message "Installing Neovim plugins..."
-    nvim --headless +PlugInstall +qa 2>/dev/null || {
-        echo "Error: Plugin installation failed" >&2
-        exit 1
-    }
-}
-
-install_ubuntu() {
-    if [ "$ENV_TYPE" = "termux" ]; then
-        debug_message "Installing Ubuntu proot environment..."
-        proot-distro install ubuntu || {
-            echo "Error: Failed to install Ubuntu via proot-distro" >&2
-            exit 1
-        }
-        debug_message "Ubuntu proot installation completed."
-    else
-        debug_message "Skipping Ubuntu installation - already in proot environment"
-    fi
-}
-
-# Verification
-verify_installation() {
-    debug_message "Verifying installations..."
-    echo -e "\n\033[1;32mInstallation complete!\033[0m"
-    
-    echo -e "\nVersions:"
-    command -v git >/dev/null && git --version
-    command -v node >/dev/null && node --version
-    command -v nvim >/dev/null && nvim --version | head -n1
-    
-    debug_message "Testing truecolor support..."
-    curl -s https://gist.githubusercontent.com/lifepillar/09a44b8cf0f9397465614e622979107f/raw/24-bit-color.sh | bash
-}
-
-# Main function
+# Main execution flow
 main() {
-    debug_message "Starting installation process..."
-    
-    # Detect execution environment
+    debug_message "Starting environment detection"
     ENV_TYPE=$(detect_environment)
-    debug_message "Detected environment: $ENV_TYPE"
-    
-    # Handle environment validation
-    case $ENV_TYPE in
-        "termux")
-            debug_message "Initializing Termux setup..."
-            ;;
-        "ubuntu_proot")
-            debug_message "Initializing Ubuntu proot setup..."
-            ;;
-        "other_proot")
-            echo "ERROR: Unsupported proot environment" >&2
-            echo "This script only works in:" >&2
-            echo "- Native Termux installation" >&2
-            echo "- Ubuntu proot distribution" >&2
-            exit 1
-            ;;
-        *)
-            echo "ERROR: Unrecognized execution environment" >&2
-            echo "Could not detect either:" >&2
-            echo "- Termux (make sure you're not in proot)" >&2
-            echo "- Ubuntu proot distribution" >&2
-            exit 1
-            ;;
-    esac
-    
-    # Initialize package management
+    debug_message "Detected environment: ${YELLOW}$ENV_TYPE${RESET}"
+
     setup_package_manager
-    
-    # Update package lists
-    debug_message "Updating package repositories..."
+
+    debug_message "Updating packages"
     $UPDATE_CMD || {
-        echo "Error: Failed to update package lists" >&2
+        echo -e "${RED}Failed to update packages${RESET}" >&2
         exit 1
     }
-    
-    # Core installation sequence
+
     install_core_packages
-    install_ubuntu
-    configure_truecolor
-    setup_zsh
-    configure_neovim
-    install_neovim_plugins
-    verify_installation
-    
-    # Post-install guidance
-    echo -e "\n\033[1;33mNext steps:\033[0m"
-    case $ENV_TYPE in
-        "termux")
-            echo "1. Restart Termux session"
-            echo "2. Start Neovim: nvim"
-            echo "3. Access Ubuntu: proot-distro login ubuntu"
-            ;;
-        "ubuntu_proot")
-            echo "1. Restart shell session: exec zsh"
-            echo "2. Start Neovim: nvim"
-            ;;
-    esac
-    
-    debug_message "Installation process completed successfully"
+    configure_environment
+
+    debug_message "${GREEN}Environment setup completed successfully${RESET}"
 }
 
-# Start main process
-main
+# Entry point
+main "$@"
