@@ -1,160 +1,250 @@
 #!/bin/bash
-set -eo pipefail
+set -e
 
-# Redirect all output to logs with timestamp
-exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }' | tee -a setup_output.log)
-exec 2> >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }' | tee -a setup_errors.log >&2)
+# Redirect stdout to a log file and stderr to a separate log file
+exec > >(tee -a setup_output.log) 2> >(tee -a setup_errors.log >&2)
 
-# Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-RESET='\033[0m'
-
-# Enhanced debug logging
+# Function to print debug messages with timestamps and colors
 debug_message() {
-    echo -e "${GREEN}[${YELLOW}$(date +"%Y-%m-%d %H:%M:%S")${GREEN}]${BLUE} $1 ${RESET}"
+    # Define colors using ANSI escape codes
+    local GREEN='\033[0;32m'  # Green text
+    local YELLOW='\033[1;33m' # Bold yellow text
+    local RESET='\033[0m'     # Reset to default terminal color
+
+    # Print the message with a timestamp and color
+    echo -e "${GREEN}[${YELLOW}$(date +"%Y-%m-%d %H:%M:%S")${GREEN}] ${RESET}$1"
 }
 
-# Process ancestry check for proot
-check_proot_process() {
-    local pid=$$
-    while [ "$pid" -ne 1 ]; do
-        if ps -p "$pid" -o comm= | grep -qi 'proot'; then
-            return 0
-        fi
-        pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
-    done
-    return 1
-}
-
-# Multi-layered environment detection
-detect_environment() {
-    # Check Termux first
-    if [ -n "$TERMUX_VERSION" ] && [ -x "$PREFIX/bin/pkg" ]; then
-        echo "termux"
-        return
-    fi
-
-    # Proot environment checks
-    local is_proot_env=false
-    if check_proot_process; then
-        is_proot_env=true
-    elif [ -f "/proc/self/root/.proot-dir" ] || [ -d "/proc/sys/fs/binfmt_misc/proot" ]; then
-        is_proot_env=true
-    elif [ "$(stat -c %i /)" != "$(stat -c %i /proc/1/root/.)" ]; then
-        is_proot_env=true
-    fi
-
-    if $is_proot_env; then
-        # Verify Ubuntu
-        if [ -f "/etc/os-release" ] && grep -qi 'ID=ubuntu' /etc/os-release && command -v apt >/dev/null; then
-            echo "ubuntu_proot"
-        else
-            # Check for bind mounts as final verification
-            if mount | grep -q 'bind.*/proc'; then
-                echo "other_proot"
-            else
-                echo "unknown"
-            fi
-        fi
-        return
-    fi
-
-    echo "unknown"
-}
-
-# Package manager configuration
-setup_package_manager() {
-    case $ENV_TYPE in
-        "termux")
-            debug_message "Configuring Termux packages"
-            UPDATE_CMD="pkg update -y"
-            INSTALL_CMD="pkg install -y"
-            ;;
-        "ubuntu_proot")
-            debug_message "Configuring Ubuntu packages"
-            UPDATE_CMD="apt update -y"
-            INSTALL_CMD="apt install -y"
-            
-            # Ensure sudo availability
-            if ! command -v sudo >/dev/null; then
-                debug_message "Installing sudo"
-                $INSTALL_CMD sudo
-            fi
-            ;;
-        "other_proot")
-            echo -e "${RED}Unsupported proot environment${RESET}" >&2
-            exit 1
-            ;;
-        *)
-            echo -e "${RED}Unrecognized execution environment${RESET}" >&2
-            exit 1
-            ;;
-    esac
-}
-
-# Core package installation
+# Function to install core packages
 install_core_packages() {
-    local base_packages="git curl wget zsh neovim ncurses-utils"
-    
-    debug_message "Installing core packages"
-    case $ENV_TYPE in
-        "termux")
-            $INSTALL_CMD $base_packages nodejs openssh proot-distro clang make
-            ;;
-        "ubuntu_proot")
-            $INSTALL_CMD $base_packages nodejs npm build-essential proot
-            ;;
-    esac || {
-        echo -e "${RED}Package installation failed${RESET}" >&2
+    debug_message "Starting installation of core packages..."
+    pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro || {
+        echo "Error: Failed to install core packages." >&2
         exit 1
     }
+    debug_message "Finished installation of core packages."
 }
 
-# Environment-specific configurations
-configure_environment() {
-    debug_message "Configuring environment specifics"
-    
-    # Truecolor support
-    if ! grep -q "COLORTERM=truecolor" ~/.zshrc 2>/dev/null; then
-        echo "export COLORTERM=truecolor" >> ~/.zshrc
-    fi
-
-    case $ENV_TYPE in
-        "termux")
-            # Termux-specific settings
-            mkdir -p ~/.termux
-            echo "termux-transient-keys = enter,arrow" >> ~/.termux/termux.properties
-            termux-reload-settings
-            ;;
-        "ubuntu_proot")
-            # Ubuntu proot optimizations
-            echo "export PROOT_NO_SECCOMP=1" >> ~/.zshrc
-            ;;
-    esac
+# Function to install Ubuntu via proot-distro
+install_ubuntu() {
+    debug_message "Starting installation of Ubuntu via proot-distro..."
+    proot-distro install ubuntu || {
+        echo "Error: Failed to install Ubuntu via proot-distro." >&2
+        exit 1
+    }
+    debug_message "Finished installation of Ubuntu."
 }
 
-# Main execution flow
+# Function to configure truecolor support in Termux
+configure_truecolor() {
+    debug_message "Starting configuration of truecolor support..."
+    mkdir -p ~/.termux || {
+        echo "Error: Failed to create ~/.termux directory." >&2
+        exit 1
+    }
+    echo "termux-transient-keys = enter,arrow" > ~/.termux/termux.properties || {
+        echo "Error: Failed to write to ~/.termux/termux.properties." >&2
+        exit 1
+    }
+    echo "export COLORTERM=truecolor" >> ~/.bashrc || {
+        echo "Error: Failed to update ~/.bashrc." >&2
+        exit 1
+    }
+    echo "export TERM=xterm-256color" >> ~/.bashrc || {
+        echo "Error: Failed to update ~/.bashrc." >&2
+        exit 1
+    }
+    termux-reload-settings || {
+        echo "Error: Failed to reload Termux settings." >&2
+        exit 1
+    }
+    debug_message "Finished configuration of truecolor support."
+}
+
+# Function to set up Zsh and Oh My Zsh
+setup_zsh() {
+    debug_message "Starting Zsh setup..."
+    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
+        echo "Error: Failed to install Oh My Zsh." >&2
+        exit 1
+    }
+    sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="af-magic"/' ~/.zshrc || {
+        echo "Error: Failed to update Zsh theme in ~/.zshrc." >&2
+        exit 1
+    }
+    echo "export TERM=xterm-256color" >> ~/.zshrc || {
+        echo "Error: Failed to update ~/.zshrc." >&2
+        exit 1
+    }
+    chsh -s zsh || {
+        echo "Error: Failed to set Zsh as default shell." >&2
+        exit 1
+    }
+    debug_message "Finished Zsh setup."
+}
+
+# Function to install vim-plug for Neovim
+install_vim_plug() {
+    debug_message "Starting installation of vim-plug..."
+    VIM_PLUG_PATH="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/autoload/plug.vim"
+    curl -fLo "$VIM_PLUG_PATH" --create-dirs \
+        https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim || {
+        echo "Error: Failed to install vim-plug." >&2
+        exit 1
+    }
+    debug_message "Finished installation of vim-plug."
+}
+
+# Function to create Neovim configuration
+configure_neovim() {
+    debug_message "Starting Neovim configuration..."
+    NVIM_DIR="$HOME/.config/nvim"
+    mkdir -p "$NVIM_DIR" || {
+        echo "Error: Failed to create Neovim config directory." >&2
+        exit 1
+    }
+
+    cat > "$NVIM_DIR/init.vim" << 'EOF'
+" Plugin management
+call plug#begin('~/.local/share/nvim/plugged')
+Plug 'preservim/nerdtree'
+Plug 'itchyny/lightline.vim'
+Plug 'morhetz/gruvbox'
+Plug 'nvim-treesitter/nvim-treesitter'
+Plug 'Yggdroot/indentLine'
+call plug#end()
+" Gruvbox configuration
+colorscheme gruvbox
+set background=dark
+let g:gruvbox_contrast_dark = 'medium'
+let g:gruvbox_italic = 1
+" IndentLine configuration
+let g:indentLine_char = '│'      " Use Unicode vertical bar
+let g:indentLine_color_term = 239 " Dark gray color
+" Treesitter configuration
+lua << END
+require'nvim-treesitter.configs'.setup {
+  ensure_installed = {'javascript', 'typescript', 'lua', 'python', 'bash', 'json'},
+  highlight = {
+    enable = true,
+    additional_vim_regex_highlighting = false,
+  },
+  indent = {
+    enable = true
+  }
+}
+END
+" Truecolor configuration
+set termguicolors
+let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+" Core editor settings
+set nocompatible
+set tabstop=2
+set shiftwidth=2
+set softtabstop=2
+set expandtab
+set nobackup
+set nowritebackup
+set noswapfile
+set smartindent
+set cursorline
+set scrolloff=8
+set laststatus=2
+set number
+" NERDTree configuration
+nnoremap <leader>n :NERDTreeFocus<CR>
+nnoremap <C-n> :NERDTree<CR>
+nnoremap <C-t> :NERDTreeToggle<CR>
+nnoremap <C-f> :NERDTreeFind<CR>
+" Lightline configuration
+let g:lightline = {
+      \ 'colorscheme': 'gruvbox',
+      \ 'active': {
+      \   'left': [ [ 'mode', 'paste' ],
+      \             [ 'gitbranch', 'readonly', 'filename', 'modified' ] ]
+      \ },
+      \ }
+syntax on
+EOF
+    debug_message "Finished Neovim configuration."
+}
+
+# Function to install Neovim plugins
+install_neovim_plugins() {
+    debug_message "Starting installation of Neovim plugins..."
+    nvim --headless +PlugInstall +qa 2>/dev/null || {
+        echo "Error: Failed to install Neovim plugins." >&2
+        exit 1
+    }
+    debug_message "Finished installation of Neovim plugins."
+}
+
+# Function to compile Treesitter parsers
+compile_treesitter_parsers() {
+    debug_message "Starting compilation of Treesitter parsers..."
+    nvim --headless -c "TSInstallSync javascript typescript lua python bash json" -c "qall" || {
+        echo "Error: Failed to compile Treesitter parsers." >&2
+        exit 1
+    }
+    debug_message "Finished compilation of Treesitter parsers."
+}
+
+# Function to verify installations
+verify_installations() {
+    debug_message "Verifying installations..."
+    echo -e "\n\033[1;32mInstallation complete!\033[0m"
+    echo -e "\nVersions:"
+    git --version | head -n 1 || {
+        echo "Error: Git version check failed." >&2
+        exit 1
+    }
+    node --version || {
+        echo "Error: Node.js version check failed." >&2
+        exit 1
+    }
+    nvim --version | head -n 1 || {
+        echo "Error: Neovim version check failed." >&2
+        exit 1
+    }
+    zsh --version || {
+        echo "Error: Zsh version check failed." >&2
+        exit 1
+    }
+    echo -e "\n\033[38;2;255;100;100mTruecolor test:\033[0m"
+    curl -s https://gist.githubusercontent.com/lifepillar/09a44b8cf0f9397465614e622979107f/raw/24-bit-color.sh | bash || {
+        echo "Error: Truecolor test failed." >&2
+        exit 1
+    }
+    debug_message "Finished verification."
+}
+
+# Function to display next steps
+display_next_steps() {
+    debug_message "Displaying next steps..."
+    echo -e "\n\033[1;33mNext steps:\033[0m"
+    echo "1. Restart Termux session to activate Zsh"
+    echo "2. Start Neovim: nvim"
+    debug_message "Finished displaying next steps."
+}
+
+# Main function to execute all setup steps
 main() {
-    debug_message "Starting environment detection"
-    ENV_TYPE=$(detect_environment)
-    debug_message "Detected environment: ${YELLOW}$ENV_TYPE${RESET}"
-
-    setup_package_manager
-
-    debug_message "Updating packages"
-    $UPDATE_CMD || {
-        echo -e "${RED}Failed to update packages${RESET}" >&2
-        exit 1
-    }
-
     install_core_packages
-    configure_environment
+    install_ubuntu
+    configure_truecolor
+    setup_zsh
+    install_vim_plug
+    configure_neovim
 
-    debug_message "${GREEN}Environment setup completed successfully${RESET}"
+    # Run Neovim plugin installation and Treesitter compilation sequentially
+    debug_message "Starting sequential installation of Neovim plugins and Treesitter parsers..."
+    install_neovim_plugins
+    compile_treesitter_parsers
+
+    verify_installations
+    display_next_steps
 }
 
-# Entry point
-main "$@"
+# Execute the main function
+main
