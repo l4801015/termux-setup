@@ -27,12 +27,28 @@ install_core_packages() {
 
 # Function to install Ubuntu via proot-distro
 install_ubuntu() {
-    debug_message "Starting installation of Ubuntu via proot-distro..."
-    proot-distro install ubuntu || {
-        echo "Error: Failed to install Ubuntu via proot-distro." >&2
-        exit 1
-    }
-    debug_message "Finished installation of Ubuntu."
+    debug_message "Checking Ubuntu installation status..."
+
+    # Robust check using installed rootfs directory
+    if [ -d "$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu" ]; then
+        debug_message "Ubuntu rootfs detected. Installation exists."
+        return 0
+    fi
+
+    debug_message "Starting Ubuntu installation..."
+
+    # Install with error pattern matching
+    if ! proot-distro install ubuntu 2>&1 | tee -a setup_errors.log; then
+        if grep -q "already installed" setup_errors.log; then
+            debug_message "Ubuntu already installed (hidden detection). Continuing..."
+            return 0
+        else
+            echo "Error: Critical failure during Ubuntu installation" >&2
+            exit 1
+        fi
+    fi
+
+    debug_message "Ubuntu installed successfully."
 }
 
 # Function to configure truecolor support in Termux
