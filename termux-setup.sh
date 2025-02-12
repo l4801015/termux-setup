@@ -80,9 +80,21 @@ configure_truecolor() {
 setup_zsh() {
     debug_message "Starting Zsh setup..."
 
-    # Check if Oh My Zsh is already installed
+    # Check if Zsh is installed
+    if command -v zsh >/dev/null 2>&1; then
+        echo "Zsh is already installed. Skipping Zsh installation..."
+    else
+        # Install Zsh
+        debug_message "Installing Zsh..."
+        sudo apt-get install -y zsh || {
+            echo "Error: Failed to install Zsh." >&2
+            exit 1
+        }
+    fi
+
+    # Check if Oh My Zsh is installed
     if [ -d "${ZSH:-$HOME/.oh-my-zsh}" ]; then
-        echo "Oh My Zsh is already installed. Skipping installation..."
+        echo "Oh My Zsh is already installed. Skipping Oh My Zsh installation..."
     else
         # Install Oh My Zsh without changing the default shell or running Zsh immediately
         RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
@@ -103,11 +115,15 @@ setup_zsh() {
         exit 1
     }
 
-    # Change default shell to Zsh
-    chsh -s "$(which zsh)" || {
-        echo "Error: Failed to set Zsh as default shell." >&2
-        exit 1
-    }
+    # Change default shell to Zsh if not already set
+    if [ "$SHELL" != "$(which zsh)" ]; then
+        chsh -s "$(which zsh)" || {
+            echo "Error: Failed to set Zsh as default shell." >&2
+            exit 1
+        }
+    else
+        echo "Zsh is already the default shell. Skipping shell change..."
+    fi
 
     debug_message "Finished Zsh setup."
 }
