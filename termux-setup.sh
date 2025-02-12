@@ -77,25 +77,38 @@ configure_truecolor() {
     debug_message "Finished configuration of truecolor support."
 }
 
-# Function to set up Zsh and Oh My Zsh
 setup_zsh() {
     debug_message "Starting Zsh setup..."
-    RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
-        echo "Error: Failed to install Oh My Zsh." >&2
-        exit 1
-    }
-    sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="af-magic"/' ~/.zshrc || {
+
+    # Check if Oh My Zsh is already installed
+    if [ -d "${ZSH:-$HOME/.oh-my-zsh}" ]; then
+        echo "Oh My Zsh is already installed. Skipping installation..."
+    else
+        # Install Oh My Zsh without changing the default shell or running Zsh immediately
+        RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || {
+            echo "Error: Failed to install Oh My Zsh." >&2
+            exit 1
+        }
+    fi
+
+    # Update Zsh theme safely
+    sed -i 's/^ZSH_THEME=".*"/ZSH_THEME="af-magic"/' ~/.zshrc || {
         echo "Error: Failed to update Zsh theme in ~/.zshrc." >&2
         exit 1
     }
-    echo "export TERM=xterm-256color" >> ~/.zshrc || {
+
+    # Ensure TERM variable is set without duplication
+    grep -qxF 'export TERM=xterm-256color' ~/.zshrc || echo 'export TERM=xterm-256color' >> ~/.zshrc || {
         echo "Error: Failed to update ~/.zshrc." >&2
         exit 1
     }
-    chsh -s zsh || {
+
+    # Change default shell to Zsh
+    chsh -s "$(which zsh)" || {
         echo "Error: Failed to set Zsh as default shell." >&2
         exit 1
     }
+
     debug_message "Finished Zsh setup."
 }
 
