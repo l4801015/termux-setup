@@ -86,14 +86,15 @@ setup_zsh() {
     else
         # Install Zsh
         debug_message "Installing Zsh..."
-        sudo apt-get install -y zsh || {
+        pkg install -y zsh || {
             echo "Error: Failed to install Zsh." >&2
             exit 1
         }
     fi
 
     # Check if Oh My Zsh is installed
-    if [ -d "${ZSH:-$HOME/.oh-my-zsh}" ]; then
+    OH_MY_ZSH_DIR="$HOME/.oh-my-zsh"
+    if [ -d "$OH_MY_ZSH_DIR" ]; then
         echo "Oh My Zsh is already installed. Skipping Oh My Zsh installation..."
     else
         # Install Oh My Zsh without changing the default shell or running Zsh immediately
@@ -115,18 +116,15 @@ setup_zsh() {
         exit 1
     }
 
-    # Change default shell to Zsh if not already set
-    if [ "$SHELL" != "$(which zsh)" ]; then
-        chsh -s "$(which zsh)" || {
-            echo "Error: Failed to set Zsh as default shell." >&2
-            exit 1
-        }
-    else
-        echo "Zsh is already the default shell. Skipping shell change..."
-    fi
+    # Set Zsh as the default shell manually in Termux
+    echo "exec zsh" >> ~/.profile || {
+        echo "Error: Failed to set Zsh as default shell in ~/.profile." >&2
+        exit 1
+    }
 
     debug_message "Finished Zsh setup."
 }
+
 
 # Function to install vim-plug for Neovim
 install_vim_plug() {
