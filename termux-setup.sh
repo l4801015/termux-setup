@@ -15,29 +15,21 @@ debug_message() {
     echo -e "${GREEN}[${YELLOW}$(date +"%Y-%m-%d %H:%M:%S")${GREEN}] ${RESET}$1"
 }
 
-# Function to install core packages
-install_core_packages() {
-    debug_message "Starting installation of core packages..."
-
-    # Detect environment and use appropriate package manager
-    if [ -d "$PREFIX" ] && [ -d "/data/data/com.termux/files/usr" ]; then
-        # Termux environment
-        pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro || {
-            echo "Error: Failed to install core packages in Termux." >&2
-            exit 1
-        }
-    elif grep -q "Ubuntu" /etc/os-release; then
-        # Ubuntu proot environment
-        apt update && apt install -y git nodejs curl wget openssh-client zsh neovim ncurses-base clang make || {
-            echo "Error: Failed to install core packages in Ubuntu proot." >&2
-            exit 1
-        }
-    else
-        echo "Error: Unknown environment." >&2
+# Core Installation Functions
+install_termux_core() {
+    debug_message "Installing Termux core packages..."
+    pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro || {
+        echo "Error: Termux core installation failed" >&2
         exit 1
-    fi
+    }
+}
 
-    debug_message "Finished installation of core packages."
+install_ubuntu_core() {
+    debug_message "Installing Ubuntu core packages..."
+    apt update && apt install -y git nodejs curl wget openssh-client zsh neovim ncurses-base clang make || {
+        echo "Error: Ubuntu core installation failed" >&2
+        exit 1
+    }
 }
 
 # Function to install Ubuntu via proot-distro
@@ -319,44 +311,39 @@ display_next_steps() {
     debug_message "Finished displaying next steps."
 }
 
-# Main function to execute all setup steps
-# Main function to execute all setup steps
+# Shared Post-Installation Workflow
+common_post_installation() {
+    configure_truecolor
+    setup_zsh
+    install_vim_plug
+    configure_neovim
+    
+    debug_message "Installing Neovim plugins and parsers..."
+    install_neovim_plugins
+    compile_treesitter_parsers
+
+    verify_installations
+    display_next_steps
+}
+
+# Main Execution Flow
 main() {
     if [ -d "$PREFIX" ] && [ -d "/data/data/com.termux/files/usr" ]; then
-        # Termux environment
-        install_core_packages
-        install_ubuntu  # Added Ubuntu installation for Termux
-        configure_truecolor
-        setup_zsh
-        install_vim_plug
-        configure_neovim
-
-        # Run Neovim plugin installation and Treesitter compilation sequentially
-        debug_message "Starting sequential installation of Neovim plugins and Treesitter parsers..."
-        install_neovim_plugins
-        compile_treesitter_parsers
-
-        verify_installations
-        display_next_steps
+        debug_message "Starting Termux environment setup"
+        install_termux_core
+        install_ubuntu  # Proot Ubuntu installation
+        common_post_installation
+        
     elif grep -q "Ubuntu" /etc/os-release; then
-        # Ubuntu proot environment
-        install_core_packages
-        configure_truecolor
-        setup_zsh
-        install_vim_plug
-        configure_neovim
-
-        # Run Neovim plugin installation and Treesitter compilation sequentially
-        debug_message "Starting sequential installation of Neovim plugins and Treesitter parsers..."
-        install_neovim_plugins
-        compile_treesitter_parsers
-
-        verify_installations
-        display_next_steps
+        debug_message "Starting Ubuntu environment setup"
+        install_ubuntu_core
+        common_post_installation
+        
     else
-        echo "Error: Unknown environment." >&2
+        echo "Error: Unsupported environment" >&2
         exit 1
     fi
+    debug_message "Setup completed successfully"
 }
 
 # Execute the main function
