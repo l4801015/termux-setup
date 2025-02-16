@@ -320,10 +320,12 @@ display_next_steps() {
 }
 
 # Main function to execute all setup steps
+# Main function to execute all setup steps
 main() {
     if [ -d "$PREFIX" ] && [ -d "/data/data/com.termux/files/usr" ]; then
         # Termux environment
         install_core_packages
+        install_ubuntu  # Added Ubuntu installation for Termux
         configure_truecolor
         setup_zsh
         install_vim_plug
