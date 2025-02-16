@@ -18,10 +18,25 @@ debug_message() {
 # Function to install core packages
 install_core_packages() {
     debug_message "Starting installation of core packages..."
-    pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro || {
-        echo "Error: Failed to install core packages." >&2
+
+    # Detect environment and use appropriate package manager
+    if [ -d "$PREFIX" ] && [ -d "/data/data/com.termux/files/usr" ]; then
+        # Termux environment
+        pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro || {
+            echo "Error: Failed to install core packages in Termux." >&2
+            exit 1
+        }
+    elif grep -q "Ubuntu" /etc/os-release; then
+        # Ubuntu proot environment
+        apt update && apt install -y git nodejs curl wget openssh-client zsh neovim ncurses-base clang make || {
+            echo "Error: Failed to install core packages in Ubuntu proot." >&2
+            exit 1
+        }
+    else
+        echo "Error: Unknown environment." >&2
         exit 1
-    }
+    fi
+
     debug_message "Finished installation of core packages."
 }
 
@@ -307,7 +322,7 @@ display_next_steps() {
 # Main function to execute all setup steps
 main() {
     install_core_packages
-    install_ubuntu
+    #install_ubuntu
     configure_truecolor
     setup_zsh
     install_vim_plug
