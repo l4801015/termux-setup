@@ -321,20 +321,40 @@ display_next_steps() {
 
 # Main function to execute all setup steps
 main() {
-    install_core_packages
-    #install_ubuntu
-    configure_truecolor
-    setup_zsh
-    install_vim_plug
-    configure_neovim
+    if [ -d "$PREFIX" ] && [ -d "/data/data/com.termux/files/usr" ]; then
+        # Termux environment
+        install_core_packages
+        configure_truecolor
+        setup_zsh
+        install_vim_plug
+        configure_neovim
 
-    # Run Neovim plugin installation and Treesitter compilation sequentially
-    debug_message "Starting sequential installation of Neovim plugins and Treesitter parsers..."
-    install_neovim_plugins
-    compile_treesitter_parsers
+        # Run Neovim plugin installation and Treesitter compilation sequentially
+        debug_message "Starting sequential installation of Neovim plugins and Treesitter parsers..."
+        install_neovim_plugins
+        compile_treesitter_parsers
 
-    verify_installations
-    display_next_steps
+        verify_installations
+        display_next_steps
+    elif grep -q "Ubuntu" /etc/os-release; then
+        # Ubuntu proot environment
+        install_core_packages
+        configure_truecolor
+        setup_zsh
+        install_vim_plug
+        configure_neovim
+
+        # Run Neovim plugin installation and Treesitter compilation sequentially
+        debug_message "Starting sequential installation of Neovim plugins and Treesitter parsers..."
+        install_neovim_plugins
+        compile_treesitter_parsers
+
+        verify_installations
+        display_next_steps
+    else
+        echo "Error: Unknown environment." >&2
+        exit 1
+    fi
 }
 
 # Execute the main function
