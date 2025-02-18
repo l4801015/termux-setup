@@ -256,6 +256,116 @@ display_next_steps() {
     debug_message "Finished displaying next steps."
 }
 
+# Function to print debug messages with timestamps and colors
+debug_message() {
+    # Define colors using ANSI escape codes
+    local GREEN='\033[0;32m'   # Green text
+    local YELLOW='\033[1;33m'  # Bold yellow text
+    local RESET='\033[0m'      # Reset to default terminal color
+
+    # Print the message with a timestamp and color
+    echo -e "${GREEN}[${YELLOW}$(date +"%Y-%m-%d %H:%M:%S")${GREEN}] ${RESET}$1"
+}
+
+# Function to configure Git with user name and email
+configure_git() {
+    debug_message "Configuring Git with your name and email..."
+    read -p "Enter your Git username: " git_username
+    read -p "Enter your Git email: " git_email
+
+    # Set Git global configuration
+    git config --global user.name "$git_username"
+    git config --global user.email "$git_email"
+
+    debug_message "Git configured successfully."
+    debug_message "Your Git username: $git_username"
+    debug_message "Your Git email: $git_email"
+}
+
+# Function to check for existing SSH keys
+check_for_existing_ssh_keys() {
+    local ssh_dir="$HOME/.ssh"
+    debug_message "Checking for existing SSH keys in $ssh_dir..."
+
+    # Supported public key types
+    local supported_keys=("id_rsa.pub" "id_ecdsa.pub" "id_ed25519.pub")
+    local keys_found=false
+
+    # Check if .ssh directory exists
+    if [[ ! -d "$ssh_dir" ]]; then
+        debug_message "No .ssh directory found at $ssh_dir."
+        return 1
+    fi
+
+    # Look for supported public keys
+    for key in "${supported_keys[@]}"; do
+        if [[ -f "$ssh_dir/$key" ]]; then
+            debug_message "Found public key: $key"
+            debug_message "Public key content:"
+            cat "$ssh_dir/$key"
+            keys_found=true
+        fi
+    done
+
+    # If no keys were found, return failure
+    if [[ "$keys_found" == false ]]; then
+        debug_message "No supported SSH keys found in $ssh_dir."
+        return 1
+    fi
+
+    return 0
+}
+
+# Function to generate a new SSH key and add it to the ssh-agent
+generate_and_add_ssh_key() {
+    local email="$1"
+    local key_type="${2:-ed25519}"  # Default to ed25519 if no type is specified
+    local ssh_dir="$HOME/.ssh"
+    local key_name="id_$key_type"
+
+    # Check if email is provided
+    if [[ -z "$email" ]]; then
+        debug_message "Error: Email address is required."
+        debug_message "Usage: generate_and_add_ssh_key <email> [key_type]"
+        return 1
+    fi
+
+    # Create .ssh directory if it doesn't exist
+    if [[ ! -d "$ssh_dir" ]]; then
+        debug_message "Creating $ssh_dir directory..."
+        mkdir -p "$ssh_dir"
+        chmod 700 "$ssh_dir"
+    fi
+
+    # Generate SSH key
+    debug_message "Generating a new SSH key ($key_type) for $email..."
+    ssh-keygen -t "$key_type" -C "$email" -f "$ssh_dir/$key_name"
+
+    # Check if key generation was successful
+    if [[ $? -ne 0 ]]; then
+        debug_message "Failed to generate SSH key."
+        return 1
+    fi
+
+    debug_message "SSH key generated successfully: $ssh_dir/$key_name"
+
+    # Start ssh-agent
+    debug_message "Starting ssh-agent..."
+    eval "$(ssh-agent -s)" > /dev/null
+
+    # Add the private key to ssh-agent
+    debug_message "Adding private key to ssh-agent..."
+    ssh-add "$ssh_dir/$key_name"
+
+    # Display public key
+    debug_message "Your public key is:"
+    cat "$ssh_dir/$key_name.pub"
+
+    debug_message "Next steps:"
+    debug_message "1. Copy the public key above."
+    debug_message "2. Add it to your GitHub account at https://github.com/settings/keys"
+}
+
 # Shared Post-Installation Workflow
 common_post_installation() {
     configure_truecolor
@@ -267,6 +377,16 @@ common_post_installation() {
     install_neovim_plugins
 
     verify_installations
+    # Step 1: Configure Git
+    configure_git
+
+    # Step 2: Check for existing SSH keys
+    if check_for_existing_ssh_keys; then
+        debug_message "You can use one of these keys for authentication."
+    else
+        debug_message "No existing SSH keys found. Generating a new SSH key..."
+        generate_and_add_ssh_key "$(git config --global user.email)"
+    fi
     display_next_steps
 }
 
