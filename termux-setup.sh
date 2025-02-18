@@ -18,7 +18,7 @@ debug_message() {
 # Core Installation Functions
 install_termux_core() {
     debug_message "Installing Termux core packages..."
-    pkg install -y git nodejs curl wget openssh zsh neovim ncurses-utils clang make proot proot-distro || {
+    pkg install -y git nodejs curl wget openssh zsh neovim proot proot-distro || {
         echo "Error: Termux core installation failed" >&2
         exit 1
     }
@@ -26,7 +26,7 @@ install_termux_core() {
 
 install_ubuntu_core() {
     debug_message "Installing Ubuntu core packages..."
-    apt update && apt install -y git nodejs curl wget openssh-client zsh neovim ncurses-base clang make || {
+    apt update && apt install -y git nodejs curl wget openssh-client zsh neovim || {
         echo "Error: Ubuntu core installation failed" >&2
         exit 1
     }
@@ -160,7 +160,6 @@ call plug#begin('~/.local/share/nvim/plugged')
 Plug 'preservim/nerdtree'
 Plug 'itchyny/lightline.vim'
 Plug 'morhetz/gruvbox'
-Plug 'nvim-treesitter/nvim-treesitter'
 Plug 'Yggdroot/indentLine'
 call plug#end()
 " Gruvbox configuration
@@ -320,7 +319,6 @@ common_post_installation() {
 
     debug_message "Installing Neovim plugins and parsers..."
     install_neovim_plugins
-    compile_treesitter_parsers
 
     verify_installations
     display_next_steps
