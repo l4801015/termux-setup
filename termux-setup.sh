@@ -161,6 +161,7 @@ Plug 'preservim/nerdtree'
 Plug 'itchyny/lightline.vim'
 Plug 'morhetz/gruvbox'
 Plug 'Yggdroot/indentLine'
+Plug 'sheerun/vim-polyglot'
 call plug#end()
 " Gruvbox configuration
 colorscheme gruvbox
