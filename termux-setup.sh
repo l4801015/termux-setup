@@ -170,19 +170,7 @@ let g:gruvbox_italic = 1
 " IndentLine configuration
 let g:indentLine_char = '│'      " Use Unicode vertical bar
 let g:indentLine_color_term = 239 " Dark gray color
-" Treesitter configuration
-lua << END
-require'nvim-treesitter.configs'.setup {
-  ensure_installed = {'javascript', 'typescript', 'lua', 'python', 'bash', 'json'},
-  highlight = {
-    enable = true,
-    additional_vim_regex_highlighting = false,
-  },
-  indent = {
-    enable = true
-  }
-}
-END
+
 " Truecolor configuration
 set termguicolors
 let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
