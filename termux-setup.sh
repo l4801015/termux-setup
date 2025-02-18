@@ -146,7 +146,7 @@ install_vim_plug() {
 }
 
 # Function to create Neovim configuration
-configure_neovim() {
+configure_neovim_termux() {
     debug_message "Starting Neovim configuration..."
     NVIM_DIR="$HOME/.config/nvim"
     mkdir -p "$NVIM_DIR" || {
@@ -162,6 +162,70 @@ Plug 'itchyny/lightline.vim'
 Plug 'morhetz/gruvbox'
 Plug 'Yggdroot/indentLine'
 Plug 'sheerun/vim-polyglot'
+call plug#end()
+" Gruvbox configuration
+colorscheme gruvbox
+set background=dark
+let g:gruvbox_contrast_dark = 'medium'
+let g:gruvbox_italic = 1
+" IndentLine configuration
+let g:indentLine_char = '│'      " Use Unicode vertical bar
+let g:indentLine_color_term = 239 " Dark gray color
+
+" Truecolor configuration
+set termguicolors
+let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+" Core editor settings
+set nocompatible
+set tabstop=2
+set shiftwidth=2
+set softtabstop=2
+set expandtab
+set nobackup
+set nowritebackup
+set noswapfile
+set smartindent
+set cursorline
+set scrolloff=8
+set laststatus=2
+set number
+" NERDTree configuration
+nnoremap <leader>n :NERDTreeFocus<CR>
+nnoremap <C-n> :NERDTree<CR>
+nnoremap <C-t> :NERDTreeToggle<CR>
+nnoremap <C-f> :NERDTreeFind<CR>
+" Lightline configuration
+let g:lightline = {
+      \ 'colorscheme': 'gruvbox',
+      \ 'active': {
+      \   'left': [ [ 'mode', 'paste' ],
+      \             [ 'gitbranch', 'readonly', 'filename', 'modified' ] ]
+      \ },
+      \ }
+syntax on
+EOF
+    debug_message "Finished Neovim configuration."
+}
+
+# Function to create Neovim configuration
+configure_neovim_ubuntu() {
+    debug_message "Starting Neovim configuration..."
+    NVIM_DIR="$HOME/.config/nvim"
+    mkdir -p "$NVIM_DIR" || {
+        echo "Error: Failed to create Neovim config directory." >&2
+        exit 1
+    }
+
+    cat > "$NVIM_DIR/init.vim" << 'EOF'
+" Plugin management
+call plug#begin('~/.local/share/nvim/plugged')
+Plug 'preservim/nerdtree'
+Plug 'itchyny/lightline.vim'
+Plug 'morhetz/gruvbox'
+Plug 'Yggdroot/indentLine'
+Plug 'sheerun/vim-polyglot'
+Plug 'Exafunction/codeium.vim', { 'branch': 'main' }
 call plug#end()
 " Gruvbox configuration
 colorscheme gruvbox
@@ -371,7 +435,6 @@ common_post_installation() {
     configure_truecolor
     setup_zsh
     install_vim_plug
-    configure_neovim
 
     debug_message "Installing Neovim plugins and parsers..."
     install_neovim_plugins
@@ -396,11 +459,14 @@ main() {
         debug_message "Starting Termux environment setup"
         install_termux_core
         install_ubuntu  # Proot Ubuntu installation
+        configure_neovim_termux
         common_post_installation
 
     elif grep -q "Ubuntu" /etc/os-release; then
         debug_message "Starting Ubuntu environment setup"
         install_ubuntu_core
+
+        configure_neovim_ubuntu
         common_post_installation
 
     else
