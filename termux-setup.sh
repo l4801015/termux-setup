@@ -229,49 +229,6 @@ install_neovim_plugins() {
     debug_message "Finished installation of Neovim plugins."
 }
 
-# Function to compile Treesitter parsers
-compile_treesitter_parsers() {
-    debug_message "Initializing Tree-sitter environment..."
-
-    # First ensure parsers are available through health check
-    if nvim --headless -c "checkhealth treesitter" -c "qall" 2>/dev/null | grep -q "ERROR"; then
-        debug_message "Found Tree-sitter initialization issues, fixing..."
-        nvim --headless -c "TSUpdateSync" -c "qall" || {
-            echo "Error: Critical Tree-sitter initialization failed" >&2
-            exit 1
-        }
-    fi
-
-    debug_message "Verifying Tree-sitter parsers..."
-
-    # List of essential parsers (space-separated)
-    local parsers=("javascript" "typescript" "lua" "python" "bash" "json")
-    local missing=()
-
-    # Check using Neovim's internal parser list
-    for parser in "${parsers[@]}"; do
-        if ! nvim --headless -c "lua if not vim.treesitter.language.get('$parser') then os.exit(1) end" -c "qall" 2>/dev/null; then
-            missing+=("$parser")
-        fi
-    done
-
-    if [ ${#missing[@]} -eq 0 ]; then
-        debug_message "All parsers already active. Skipping compilation."
-        return 0
-    fi
-
-    debug_message "Installing missing parsers: ${missing[*]}..."
-
-    # Install with explicit parser sync
-    nvim --headless -c "TSInstallSync ${missing[*]}" -c "qall" || {
-        echo "Error: Failed to install parsers: ${missing[*]}" >&2
-        echo "Check available parsers with: nvim --headless -c 'TSInstallInfo' -c 'qall'" >&2
-        exit 1
-    }
-
-    debug_message "Tree-sitter compilation verified."
-}
-
 # Function to verify installations
 verify_installations() {
     debug_message "Verifying installations..."
