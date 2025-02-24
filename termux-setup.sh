@@ -320,17 +320,6 @@ display_next_steps() {
     debug_message "Finished displaying next steps."
 }
 
-# Function to print debug messages with timestamps and colors
-debug_message() {
-    # Define colors using ANSI escape codes
-    local GREEN='\033[0;32m'   # Green text
-    local YELLOW='\033[1;33m'  # Bold yellow text
-    local RESET='\033[0m'      # Reset to default terminal color
-
-    # Print the message with a timestamp and color
-    echo -e "${GREEN}[${YELLOW}$(date +"%Y-%m-%d %H:%M:%S")${GREEN}] ${RESET}$1"
-}
-
 # Function to configure Git with user name and email
 configure_git() {
     debug_message "Configuring Git with your name and email..."
