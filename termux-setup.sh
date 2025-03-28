@@ -337,11 +337,12 @@ main() {
         read -p "Do you want to install proot Ubuntu? [Y/n] " user_input
         case "$user_input" in
             [Nn]* )
-                debug_message "User opted not to install proot Ubuntu"
+                debug_message "User opted not to install proot Ubuntu; removing proot"
+                pkg remove proot -y 2>/dev/null || true  # Silent removal with error suppression
                 ;;
             * )
                 debug_message "Proceeding with proot Ubuntu installation"
-                install_ubuntu  # Proot Ubuntu installation
+                install_ubuntu
                 ;;
         esac
         
