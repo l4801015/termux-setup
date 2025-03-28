@@ -331,7 +331,20 @@ main() {
     if [ -d "$PREFIX" ] && [ -d "/data/data/com.termux/files/usr" ]; then
         debug_message "Starting Termux environment setup"
         install_termux_core
-        install_ubuntu  # Proot Ubuntu installation
+        
+        # Prompt user for Ubuntu installation
+        echo
+        read -p "Do you want to install proot Ubuntu? [Y/n] " user_input
+        case "$user_input" in
+            [Nn]* )
+                debug_message "User opted not to install proot Ubuntu"
+                ;;
+            * )
+                debug_message "Proceeding with proot Ubuntu installation"
+                install_ubuntu  # Proot Ubuntu installation
+                ;;
+        esac
+        
         common_post_installation
         
     elif grep -q "Ubuntu" /etc/os-release; then
