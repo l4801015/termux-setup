@@ -1,11 +1,17 @@
 ```
 sh -c 'G="\033[32m";Y="\033[33m";R="\033[31m";B="\033[34m";X="\033[0m";
 check_storage() { [ -d "$HOME/storage/downloads" ] && [ -w "$HOME/storage/downloads" ];};
+install_packages() {
+  printf "%b\n" "${B}▶ Installing essential packages...$X";
+  pkg install git nodejs curl openssh zsh neovim -y;
+  printf "%b\n" "${G}✓ Package installation completed!$X";
+};
 run_updates() {
   printf "%b\n" "${B}▶ Updating packages (keeping configs)...$X";
   pkg update -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y;
   pkg upgrade -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y;
   printf "%b\n" "${G}✓ Updates completed!$X";
+  install_packages;  # NEW: Added package installation after updates
 };
 if check_storage; then
   printf "%b\n" "${G}✓ Storage active!$X";
