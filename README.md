@@ -13,7 +13,7 @@ One-command configuration for Termux with development essentials.
   (apt update -y && \
    apt upgrade -y && \
    apt install git -y) ) && \
-git clone -b easy/termux-setup \
+git clone -b light/termux-setup \
   https://github.com/l4801015/termux-setup.git && \
 cd termux-setup && \
 chmod +x termux-setup.sh && \
