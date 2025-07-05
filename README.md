@@ -27,6 +27,18 @@ else RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohm
 echo "Error: Failed to install Oh My Zsh." >&2; exit 1; }; fi; \
 sed -i "s/^ZSH_THEME=\".*\"/ZSH_THEME=\"af-magic\"/" ~/.zshrc || { \
 echo "Error: Failed to update Zsh theme in ~/.zshrc." >&2; exit 1; }; \
+# ADDED PLUGINS CONFIGURATION START
+debug_message "Configuring Zsh plugins..."; \
+OH_MY_ZSH_PLUGINS_DIR="$HOME/.oh-my-zsh/custom/plugins"; \
+mkdir -p "$OH_MY_ZSH_PLUGINS_DIR"; \
+git clone https://github.com/zsh-users/zsh-autosuggestions.git "$OH_MY_ZSH_PLUGINS_DIR/zsh-autosuggestions" 2>/dev/null || true; \
+git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$OH_MY_ZSH_PLUGINS_DIR/zsh-syntax-highlighting" 2>/dev/null || true; \
+sed -i "s/^plugins=(.*)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/" ~/.zshrc || { \
+echo "Error: Failed to add plugins to ~/.zshrc." >&2; exit 1; }; \
+# IMPORTANT: Load syntax highlighting AFTER autosuggestions
+echo "source $OH_MY_ZSH_PLUGINS_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> ~/.zshrc || { \
+echo "Error: Failed to load syntax highlighting." >&2; exit 1; }; \
+# ADDED PLUGINS CONFIGURATION END
 grep -qxF "export TERM=xterm-256color" ~/.zshrc || echo "export TERM=xterm-256color" >> ~/.zshrc || { \
 echo "Error: Failed to update ~/.zshrc." >&2; exit 1; }; \
 echo "exec zsh" >> ~/.profile || { echo "Error: Failed to set Zsh as default shell in ~/.profile." >&2; exit 1; }; \
@@ -47,7 +59,7 @@ printf "%s\n" \
 "Plug '\''Yggdroot/indentLine'\''" \
 "call plug#end()" \
 "try" \
-"  colorscheme gruvbox" \
+" colorscheme gruvbox" \
 "catch /^Vim\\%((\\a\\+\\))\\=:E185/" \
 "endtry" \
 "set background=dark" \
