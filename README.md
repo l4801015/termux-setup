@@ -27,7 +27,6 @@ else RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohm
 echo "Error: Failed to install Oh My Zsh." >&2; exit 1; }; fi; \
 sed -i "s/^ZSH_THEME=\".*\"/ZSH_THEME=\"af-magic\"/" ~/.zshrc || { \
 echo "Error: Failed to update Zsh theme in ~/.zshrc." >&2; exit 1; }; \
-# ADDED PLUGINS CONFIGURATION START
 debug_message "Configuring Zsh plugins..."; \
 OH_MY_ZSH_PLUGINS_DIR="$HOME/.oh-my-zsh/custom/plugins"; \
 mkdir -p "$OH_MY_ZSH_PLUGINS_DIR"; \
@@ -35,10 +34,8 @@ git clone https://github.com/zsh-users/zsh-autosuggestions.git "$OH_MY_ZSH_PLUGI
 git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$OH_MY_ZSH_PLUGINS_DIR/zsh-syntax-highlighting" 2>/dev/null || true; \
 sed -i "s/^plugins=(.*)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/" ~/.zshrc || { \
 echo "Error: Failed to add plugins to ~/.zshrc." >&2; exit 1; }; \
-# IMPORTANT: Load syntax highlighting AFTER autosuggestions
 echo "source $OH_MY_ZSH_PLUGINS_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> ~/.zshrc || { \
 echo "Error: Failed to load syntax highlighting." >&2; exit 1; }; \
-# ADDED PLUGINS CONFIGURATION END
 grep -qxF "export TERM=xterm-256color" ~/.zshrc || echo "export TERM=xterm-256color" >> ~/.zshrc || { \
 echo "Error: Failed to update ~/.zshrc." >&2; exit 1; }; \
 echo "exec zsh" >> ~/.profile || { echo "Error: Failed to set Zsh as default shell in ~/.profile." >&2; exit 1; }; \
@@ -90,6 +87,20 @@ printf "%s\n" \
 "let g:lightline = { \"colorscheme\": \"gruvbox\", \"active\": { \"left\": [ [ \"mode\", \"paste\" ], [ \"gitbranch\", \"readonly\", \"filename\", \"modified\" ] ] } }" \
 "syntax on" > "$NVIM_DIR/init.vim"; \
 debug_message "Finished Neovim configuration."; }; \
+# ============== ADDED GITHUB COPILOT INSTALLATION ============== \
+install_copilot() { \
+  debug_message "Installing GitHub Copilot..."; \
+  COPILOT_DIR="$HOME/.config/nvim/pack/github/start/copilot.vim"; \
+  if [ -d "$COPILOT_DIR" ]; then \
+    debug_message "GitHub Copilot is already installed. Skipping..."; \
+  else \
+    git clone --depth=1 https://github.com/github/copilot.vim.git "$COPILOT_DIR" || { \
+      echo "Error: Failed to install GitHub Copilot." >&2; exit 1; \
+    }; \
+    debug_message "GitHub Copilot installed successfully."; \
+  fi; \
+}; \
+# ================================================================ \
 install_neovim_plugins() { debug_message "Starting installation of Neovim plugins..."; \
 nvim --headless -c "PlugInstall" -c "qa" || { echo "Error: Failed to install Neovim plugins." >&2; exit 1; }; \
 debug_message "Finished installation of Neovim plugins."; }; \
@@ -108,9 +119,10 @@ display_next_steps() { debug_message "Displaying next steps..."; \
 echo -e "\n\033[1;33mNext steps:\033[0m"; \
 echo "1. Restart Termux session to activate Zsh"; \
 echo "2. Start Neovim: nvim"; \
+echo "3. Run :Copilot setup in Neovim to authenticate"; \
 debug_message "Finished displaying next steps."; }; \
 common_post_installation() { configure_truecolor; setup_zsh; install_vim_plug; configure_neovim; \
-install_neovim_plugins; verify_installations; display_next_steps; }; \
+install_copilot; install_neovim_plugins; verify_installations; display_next_steps; }; \
 main() { if [ -d "$PREFIX" ] && [ -d "/data/data/com.termux/files/usr" ]; then \
 debug_message "Starting Termux environment setup"; \
 if check_storage; then debug_message "Storage is already set up."; else setup_storage; fi; \
